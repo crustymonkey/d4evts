@@ -1,0 +1,23 @@
+[package]
+name = "d4evts"
+version = "0.1.0"
+description = "A simple Diablo 4 'clock' to show the next world boss and legion events"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version="4", features=["derive", "cargo"] }
+log = "0.4"
+chrono = "0.4"
+anyhow = "1"
+eframe = "0.26"
+egui = "0.26"
+
+[profile.dev]
+overflow-checks = true
+opt-level = 1
+
+[[bin]]
+name = "d4evts"
+path = "src/d4evts.rs"
