@@ -190,7 +190,7 @@ fn get_hms(delta: u64) -> String {
         mins %= 60;
     }
 
-    return format!("{hours}:{mins:02}:{seconds:02}");
+    return format!("  {hours}:{mins:02}:{seconds:02}  ");
 }
 
 /// This runs the main update loop.  This will update the countdown clock and
@@ -227,7 +227,7 @@ fn main() {
     setup_logging(&args);
 
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 140.0]),
+        viewport: egui::ViewportBuilder::default().with_inner_size([340.0, 140.0]),
         ..Default::default()
     };
 
