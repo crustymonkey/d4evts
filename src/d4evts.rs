@@ -258,13 +258,13 @@ mod tests {
     #[test]
     fn test_get_hms() {
         let mut delta = 3600 + 8 * 60 + 34; // 1:08:34
-        assert_eq!("1:08:34".to_string(), get_hms(delta));
+        assert_eq!("  1:08:34  ".to_string(), get_hms(delta));
 
         delta = 3599; // 0:59:59
-        assert_eq!("0:59:59".to_string(), get_hms(delta));
+        assert_eq!("  0:59:59  ".to_string(), get_hms(delta));
 
         delta = 1; // 0:00:01
-        assert_eq!("0:00:01".to_string(), get_hms(delta));
+        assert_eq!("  0:00:01  ".to_string(), get_hms(delta));
     }
 
     #[test]
