@@ -236,6 +236,8 @@ fn run_update_thread(
         *wb.lock().unwrap() = get_hms(wb_delta);
         if wb_delta <= 300 {
             *wb_color.lock().unwrap() = Color32::LIGHT_RED;
+        } else if wb_delta <= 600 {
+            *wb_color.lock().unwrap() = Color32::YELLOW;
         } else {
             *wb_color.lock().unwrap() = Color32::GRAY;
         }
@@ -243,12 +245,17 @@ fn run_update_thread(
         *le.lock().unwrap() = get_hms(le_delta);
         if le_delta <= 300 {
             *le_color.lock().unwrap() = Color32::LIGHT_RED;
+        } else if le_delta <= 600 {
+            *le_color.lock().unwrap() = Color32::YELLOW;
         } else {
             *le_color.lock().unwrap() = Color32::GRAY;
         }
+
         *rw.lock().unwrap() = get_hms(rw_delta);
         if rw_delta <= 300 {
             *rw_color.lock().unwrap() = Color32::LIGHT_RED;
+        } else if rw_delta <= 600 {
+            *rw_color.lock().unwrap() = Color32::YELLOW;
         } else {
             *rw_color.lock().unwrap() = Color32::GRAY;
         }
