@@ -287,7 +287,7 @@ fn main() {
     eframe::run_native(
         "Diablo 4 Events",
         options,
-        Box::new(move |_cc| Box::new(app)),
+        Box::new(move |_cc| Ok(Box::new(app))),
     )
     .expect("Failed to start the gui");
 }
