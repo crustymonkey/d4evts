@@ -1,5 +1,8 @@
 on: [push]
 name: Cargo test
+permissions:
+  contents: write
+  packages: write
 jobs:
   test:
     name: Test Suite
