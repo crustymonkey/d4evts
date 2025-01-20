@@ -5,12 +5,19 @@ extern crate clap;
 
 use chrono;
 use clap::Parser;
-use eframe::egui::{self, Color32, RichText};
 use std::{
-    sync::{Arc, Mutex},
-    thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
+use gtk4::{
+    Application,
+    ApplicationWindow,
+    gdk::Display,
+    glib,
+    prelude::*,
+};
+
+const APP_ID: &str = "com.splitstreams.d4evts";
+
 
 #[derive(Parser, Debug)]
 #[command(
@@ -21,9 +28,6 @@ use std::{
     long_about=None)
 ]
 struct Args {
-    /// Set the font size
-    #[arg(short, long, default_value_t = 30.0)]
-    font_size: f32,
     /// Turn on debug output
     #[arg(short = 'D', long)]
     debug: bool,
@@ -46,83 +50,6 @@ enum EventType {
     WB,
     LE,
     RW,
-}
-
-/// This is a struct that contains the core GUI app data
-struct MyApp {
-    wb: Arc<Mutex<String>>,
-    wb_color: Arc<Mutex<Color32>>,
-    le: Arc<Mutex<String>>,
-    le_color: Arc<Mutex<Color32>>,
-    rw: Arc<Mutex<String>>,
-    rw_color: Arc<Mutex<Color32>>,
-    font_size: f32,
-}
-
-impl MyApp {
-    /// Pass in the font size to create a new app object
-    fn new(font_size: f32) -> Self {
-        return Self {
-            wb: Arc::new(Mutex::new("".to_string())),
-            wb_color: Arc::new(Mutex::new(Color32::GRAY)),
-            le: Arc::new(Mutex::new("".to_string())),
-            le_color: Arc::new(Mutex::new(Color32::GRAY)),
-            rw: Arc::new(Mutex::new("".to_string())),
-            rw_color: Arc::new(Mutex::new(Color32::GRAY)),
-            font_size: font_size,
-        };
-    }
-}
-
-impl Default for MyApp {
-    /// Create an app object using defaults
-    fn default() -> Self {
-        return Self {
-            wb: Arc::new(Mutex::new("".to_string())),
-            wb_color: Arc::new(Mutex::new(Color32::GRAY)),
-            le: Arc::new(Mutex::new("".to_string())),
-            le_color: Arc::new(Mutex::new(Color32::GRAY)),
-            rw: Arc::new(Mutex::new("".to_string())),
-            rw_color: Arc::new(Mutex::new(Color32::GRAY)),
-            font_size: 30.0,
-        };
-    }
-}
-
-impl eframe::App for MyApp {
-    /// This sets up the design of the GUI
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.request_repaint();
-        egui::CentralPanel::default().show(ctx, |ui| {
-            egui::Grid::new("some ID").show(ui, |ui| {
-                ui.label(RichText::new("World Boss").size(self.font_size).strong());
-                ui.label(
-                    RichText::new(format!("{}", self.wb.lock().unwrap()))
-                        .size(self.font_size)
-                        .color(Color32::BLACK)
-                        .background_color(*self.wb_color.lock().unwrap()),
-                );
-
-                ui.end_row();
-                ui.label(RichText::new("Legion Event").size(self.font_size).strong());
-                ui.label(
-                    RichText::new(format!("{}", self.le.lock().unwrap()))
-                        .size(self.font_size)
-                        .color(Color32::BLACK)
-                        .background_color(*self.le_color.lock().unwrap()),
-                );
-                ui.end_row();
-                ui.label(RichText::new("Realm Walker").size(self.font_size).strong());
-                ui.label(
-                    RichText::new(format!("{}", self.rw.lock().unwrap()))
-                        .size(self.font_size)
-                        .color(Color32::BLACK)
-                        .background_color(*self.rw_color.lock().unwrap()),
-                );
-                ui.end_row();
-            });
-        });
-    }
 }
 
 struct GlobalLogger;
@@ -217,79 +144,144 @@ fn get_hms(delta: u64) -> String {
     return format!("  {hours}:{mins:02}:{seconds:02}  ");
 }
 
-/// This runs the main update loop.  This will update the countdown clock and
-/// their background colors.
-fn run_update_thread(
-    wb: Arc<Mutex<String>>,
-    wb_color: Arc<Mutex<Color32>>,
-    le: Arc<Mutex<String>>,
-    le_color: Arc<Mutex<Color32>>,
-    rw: Arc<Mutex<String>>,
-    rw_color: Arc<Mutex<Color32>>,
-) {
-    loop {
-        thread::sleep(Duration::from_secs(1));
-        let wb_delta = calc_delta(EventType::WB, None);
-        let le_delta = calc_delta(EventType::LE, None);
-        let rw_delta = calc_delta(EventType::RW, None);
 
-        *wb.lock().unwrap() = get_hms(wb_delta);
-        if wb_delta <= 300 {
-            *wb_color.lock().unwrap() = Color32::LIGHT_RED;
-        } else if wb_delta <= 600 {
-            *wb_color.lock().unwrap() = Color32::YELLOW;
-        } else {
-            *wb_color.lock().unwrap() = Color32::GRAY;
-        }
+fn update_view(wb: &gtk4::Label, le: &gtk4::Label, rw: &gtk4::Label) {
+    let wb_delta = calc_delta(EventType::WB, None);
+    let le_delta = calc_delta(EventType::LE, None);
+    let rw_delta = calc_delta(EventType::RW, None);
 
-        *le.lock().unwrap() = get_hms(le_delta);
-        if le_delta <= 300 {
-            *le_color.lock().unwrap() = Color32::LIGHT_RED;
-        } else if le_delta <= 600 {
-            *le_color.lock().unwrap() = Color32::YELLOW;
-        } else {
-            *le_color.lock().unwrap() = Color32::GRAY;
-        }
 
-        *rw.lock().unwrap() = get_hms(rw_delta);
-        if rw_delta <= 300 {
-            *rw_color.lock().unwrap() = Color32::LIGHT_RED;
-        } else if rw_delta <= 600 {
-            *rw_color.lock().unwrap() = Color32::YELLOW;
-        } else {
-            *rw_color.lock().unwrap() = Color32::GRAY;
-        }
+    wb.set_label(get_hms(wb_delta).as_str());
+    if wb_delta <= 300 {
+        wb.set_css_classes(&["danger"]);
+    } else if wb_delta <= 600 {
+        wb.set_css_classes(&["warning"]);
+    } else {
+        wb.set_css_classes(&["normal"]);
+    }
+
+    le.set_label(get_hms(le_delta).as_str());
+    if le_delta <= 300 {
+        le.set_css_classes(&["danger"]);
+    } else if le_delta <= 600 {
+        le.set_css_classes(&["warning"]);
+    } else {
+        le.set_css_classes(&["normal"]);
+    }
+
+    rw.set_label(get_hms(rw_delta).as_str());
+    if rw_delta <= 300 {
+        rw.set_css_classes(&["danger"]);
+    } else if rw_delta <= 600 {
+        rw.set_css_classes(&["warning"]);
+    } else {
+        rw.set_css_classes(&["normal"]);
     }
 }
+
+fn load_css() {
+    let provider = gtk4::CssProvider::new();
+    provider.load_from_string(include_str!("../style.css"));
+
+    gtk4::style_context_add_provider_for_display(
+        &Display::default().expect("Failed to connect to a display"),
+        &provider,
+        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
+}
+
+
+fn build_ui(app: &Application) {
+    let hzt_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Horizontal)
+        .build();
+
+    let name_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
+        .build();
+
+    let time_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
+        .build();
+
+    let wb_name = gtk4::Label::builder()
+        .label("World Boss")
+        .halign(gtk4::Align::Start)
+        .build();
+    wb_name.add_css_class("base");
+
+    let le_name = gtk4::Label::builder()
+        .label("Legion Event")
+        .halign(gtk4::Align::Start)
+        .build();
+    le_name.add_css_class("base");
+
+    let rw_name = gtk4::Label::builder()
+        .label("Realm Walker")
+        .halign(gtk4::Align::Start)
+        .build();
+    rw_name.add_css_class("base");
+
+    let wb = gtk4::Label::builder()
+        .label("0")
+        .build();
+    let le = gtk4::Label::builder()
+        .label("0")
+        .build();
+    let rw = gtk4::Label::builder()
+        .label("0")
+        .build();
+
+    wb.add_css_class("normal");
+    le.add_css_class("normal");
+    rw.add_css_class("normal");
+
+    // Run the update thread
+    glib::spawn_future_local(glib::clone!(
+        #[weak]
+        wb,
+        #[weak]
+        le,
+        #[weak]
+        rw,
+        async move {
+            loop {
+                update_view(&wb, &le, &rw);
+                glib::timeout_future_seconds(1).await;
+            }
+        }
+    ));
+
+    // Build the UI arrangement
+    hzt_box.append(&name_box);
+    hzt_box.append(&time_box);
+    name_box.append(&wb_name);
+    name_box.append(&le_name);
+    name_box.append(&rw_name);
+    time_box.append(&wb);
+    time_box.append(&le);
+    time_box.append(&rw);
+
+    let window = ApplicationWindow::builder()
+        .application(app)
+        .title("Diablo 4 Events")
+        .child(&hzt_box)
+        .build();
+
+    window.present()
+}   
+
 
 fn main() {
     let args = get_args();
     setup_logging(&args);
+    let app = Application::builder()
+        .application_id(APP_ID)
+        .build();
 
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([340.0, 140.0]),
-        ..Default::default()
-    };
-
-    let app = MyApp::new(args.font_size);
-
-    let wb = app.wb.clone();
-    let wb_color = app.wb_color.clone();
-    let le = app.le.clone();
-    let le_color = app.le_color.clone();
-    let rw = app.rw.clone();
-    let rw_color = app.rw_color.clone();
-
-    thread::spawn(move || {
-        run_update_thread(wb, wb_color, le, le_color, rw, rw_color);
-    });
-
-    eframe::run_native(
-        "Diablo 4 Events",
-        options,
-        Box::new(move |_cc| Ok(Box::new(app))),
-    )
-    .expect("Failed to start the gui");
+    app.connect_startup(|_| load_css());
+    app.connect_activate(build_ui);
+    app.run();
 }
 
 

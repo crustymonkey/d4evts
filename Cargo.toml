@@ -11,8 +11,7 @@ clap = { version="4", features=["derive", "cargo"] }
 log = "0.4"
 chrono = "0.4"
 anyhow = "1"
-eframe = "0.29"
-egui = "0.29"
+gtk4 = { version = "0.9.5", features = ["v4_14"] }
 
 [profile.dev]
 overflow-checks = true
