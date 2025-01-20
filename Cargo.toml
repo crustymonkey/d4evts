@@ -1,6 +1,6 @@
 [package]
 name = "d4evts"
-version = "0.1.4"
+version = "0.2.0"
 description = "A simple Diablo 4 'clock' to show the next world boss and legion events"
 edition = "2021"
 
