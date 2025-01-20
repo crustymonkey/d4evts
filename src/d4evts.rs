@@ -5,19 +5,10 @@ extern crate clap;
 
 use chrono;
 use clap::Parser;
-use std::{
-    time::{SystemTime, UNIX_EPOCH},
-};
-use gtk4::{
-    Application,
-    ApplicationWindow,
-    gdk::Display,
-    glib,
-    prelude::*,
-};
+use gtk4::{gdk::Display, glib, prelude::*, Application, ApplicationWindow};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const APP_ID: &str = "com.splitstreams.d4evts";
-
 
 #[derive(Parser, Debug)]
 #[command(
@@ -38,10 +29,10 @@ static LOGGER: GlobalLogger = GlobalLogger;
 // World Boss
 const WB_INIT: u64 = 1708381800;
 const WB_EVERY: u64 = 60 * 210; // Every 3.5 hours
-// Legion Event
+                                // Legion Event
 const LE_INIT: u64 = 1708381200;
 const LE_EVERY: u64 = 60 * 25; // Every 25 minutes
-// Realm Walker
+                               // Realm Walker
 const RW_INIT: u64 = 1728414300;
 const RW_EVERY: u64 = 60 * 15; // Every 15 minutes
 
@@ -118,11 +109,11 @@ fn calc_delta(ev: EventType, ts: Option<u64>) -> u64 {
         EventType::LE => {
             elapsed = (now - LE_INIT) % LE_EVERY;
             delta = LE_EVERY - elapsed;
-        },
+        }
         EventType::RW => {
             elapsed = (now - RW_INIT) % RW_EVERY;
             delta = RW_EVERY - elapsed;
-        },
+        }
     };
 
     debug!("Got delta of: {delta}");
@@ -144,12 +135,11 @@ fn get_hms(delta: u64) -> String {
     return format!("  {hours}:{mins:02}:{seconds:02}  ");
 }
 
-
+/// This updates the actual label widgets with the calculated deltas
 fn update_view(wb: &gtk4::Label, le: &gtk4::Label, rw: &gtk4::Label) {
     let wb_delta = calc_delta(EventType::WB, None);
     let le_delta = calc_delta(EventType::LE, None);
     let rw_delta = calc_delta(EventType::RW, None);
-
 
     wb.set_label(get_hms(wb_delta).as_str());
     if wb_delta <= 300 {
@@ -179,6 +169,7 @@ fn update_view(wb: &gtk4::Label, le: &gtk4::Label, rw: &gtk4::Label) {
     }
 }
 
+/// This will load the CSS from the style.css file for the widget styling
 fn load_css() {
     let provider = gtk4::CssProvider::new();
     provider.load_from_string(include_str!("../style.css"));
@@ -190,7 +181,8 @@ fn load_css() {
     );
 }
 
-
+/// This actually builds out the UI and presents it.  It also spawns the
+/// future loop
 fn build_ui(app: &Application) {
     let hzt_box = gtk4::Box::builder()
         .orientation(gtk4::Orientation::Horizontal)
@@ -222,15 +214,9 @@ fn build_ui(app: &Application) {
         .build();
     rw_name.add_css_class("base");
 
-    let wb = gtk4::Label::builder()
-        .label("0")
-        .build();
-    let le = gtk4::Label::builder()
-        .label("0")
-        .build();
-    let rw = gtk4::Label::builder()
-        .label("0")
-        .build();
+    let wb = gtk4::Label::builder().label("0").build();
+    let le = gtk4::Label::builder().label("0").build();
+    let rw = gtk4::Label::builder().label("0").build();
 
     wb.add_css_class("normal");
     le.add_css_class("normal");
@@ -262,6 +248,7 @@ fn build_ui(app: &Application) {
     time_box.append(&le);
     time_box.append(&rw);
 
+    // Create and display the window
     let window = ApplicationWindow::builder()
         .application(app)
         .title("Diablo 4 Events")
@@ -269,21 +256,17 @@ fn build_ui(app: &Application) {
         .build();
 
     window.present()
-}   
-
+}
 
 fn main() {
     let args = get_args();
     setup_logging(&args);
-    let app = Application::builder()
-        .application_id(APP_ID)
-        .build();
+    let app = Application::builder().application_id(APP_ID).build();
 
     app.connect_startup(|_| load_css());
     app.connect_activate(build_ui);
     app.run();
 }
-
 
 #[cfg(test)]
 mod tests {
