@@ -9,7 +9,7 @@ jobs:
       - name: Protoc install
         run: |
           sudo apt-get update
-          sudo apt-get install protobuf-compiler
+          sudo apt-get install protobuf-compiler glib-2.0
       - name: Toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Test
