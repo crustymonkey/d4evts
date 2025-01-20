@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Protoc install
+      - name: Protoc and GTK install
         run: |
           sudo apt-get update
           sudo apt-get install protobuf-compiler libgtk-4-dev build-essential
