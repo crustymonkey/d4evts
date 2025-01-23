@@ -17,6 +17,10 @@ gtk4 = { version = "0.9.5", features = ["v4_14"] }
 overflow-checks = true
 opt-level = 1
 
+[profile.debug-release]
+inherits = "release"
+debug = true
+
 [[bin]]
 name = "d4evts"
 path = "src/d4evts.rs"
