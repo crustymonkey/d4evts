@@ -1,11 +1,11 @@
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate clap;
+#[macro_use] extern crate log;
+#[macro_use] extern crate clap;
+#[macro_use] extern crate iced;
 
 use chrono;
 use clap::Parser;
-use gtk4::{gdk::Display, glib, prelude::*, Application, ApplicationWindow};
+use iced::widget::{text, column, container, row};
+use iced::{time, Element, Subscription};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const APP_ID: &str = "com.splitstreams.d4evts";
@@ -29,10 +29,10 @@ static LOGGER: GlobalLogger = GlobalLogger;
 // World Boss
 const WB_INIT: u64 = 1708381800;
 const WB_EVERY: u64 = 60 * 210; // Every 3.5 hours
-                                // Legion Event
+// Legion Event
 const LE_INIT: u64 = 1708381200;
 const LE_EVERY: u64 = 60 * 25; // Every 25 minutes
-                               // Realm Walker
+// Realm Walker
 const RW_INIT: u64 = 1728414300;
 const RW_EVERY: u64 = 60 * 15; // Every 15 minutes
 
@@ -41,6 +41,18 @@ enum EventType {
     WB,
     LE,
     RW,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Message {
+    Tick,
+}
+
+#[derive(Debug, Default)]
+struct Counts {
+    wb: u64,
+    le: u64,
+    rw: u64,
 }
 
 struct GlobalLogger;
@@ -135,137 +147,73 @@ fn get_hms(delta: u64) -> String {
     return format!("  {hours}:{mins:02}:{seconds:02}  ");
 }
 
-/// This updates the actual label widgets with the calculated deltas
-fn update_view(wb: &gtk4::Label, le: &gtk4::Label, rw: &gtk4::Label) {
-    let wb_delta = calc_delta(EventType::WB, None);
-    let le_delta = calc_delta(EventType::LE, None);
-    let rw_delta = calc_delta(EventType::RW, None);
-
-    wb.set_label(get_hms(wb_delta).as_str());
-    if wb_delta <= 300 {
-        wb.set_css_classes(&["danger"]);
-    } else if wb_delta <= 600 {
-        wb.set_css_classes(&["warning"]);
+fn get_color(delta: u64) -> iced::Color {
+    if delta <= 300 {
+        return color!(0xff8080); // Red
+    } else if delta <= 600 {
+        return color!(0xffff00); // Yellow
     } else {
-        wb.set_css_classes(&["normal"]);
-    }
-
-    le.set_label(get_hms(le_delta).as_str());
-    if le_delta <= 300 {
-        le.set_css_classes(&["danger"]);
-    } else if le_delta <= 600 {
-        le.set_css_classes(&["warning"]);
-    } else {
-        le.set_css_classes(&["normal"]);
-    }
-
-    rw.set_label(get_hms(rw_delta).as_str());
-    if rw_delta <= 300 {
-        rw.set_css_classes(&["danger"]);
-    } else if rw_delta <= 600 {
-        rw.set_css_classes(&["warning"]);
-    } else {
-        rw.set_css_classes(&["normal"]);
+        return color!(0x808080); // Gray
     }
 }
 
-/// This will load the CSS from the style.css file for the widget styling
-fn load_css() {
-    let provider = gtk4::CssProvider::new();
-    provider.load_from_string(include_str!("../style.css"));
-
-    gtk4::style_context_add_provider_for_display(
-        &Display::default().expect("Failed to connect to a display"),
-        &provider,
-        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
-    );
+fn update(counts: &mut Counts, _: Message) {
+    counts.wb = calc_delta(EventType::WB, None);
+    counts.le = calc_delta(EventType::LE, None);
+    counts.rw = calc_delta(EventType::RW, None);
 }
 
 /// This actually builds out the UI and presents it.  It also spawns the
 /// future loop
-fn build_ui(app: &Application) {
-    let hzt_box = gtk4::Box::builder()
-        .orientation(gtk4::Orientation::Horizontal)
-        .build();
+fn view(counts: &Counts) -> Element<'_, Message> {
+    let tsize = 30;
+    let label_col = color!(0xffffff);
+    let tcolor = color!(0x000000);
+    let cont = container(
+        row![
+            column![
+                container(text("World Boss").size(tsize).color(label_col))
+                    .padding(1),
+                container(text("Legion Event").size(tsize).color(label_col))
+                    .padding(1),
+                container(text("Realm Walker").size(tsize).color(label_col))
+                    .padding(1),
+            ],
+            column![
+                container(text(get_hms(counts.wb)).size(tsize).color(tcolor))
+                    .style(move |_| container::background(get_color(counts.wb)))
+                    .padding(1),
+                container(text(get_hms(counts.le)).size(tsize).color(tcolor))
+                    .style(move |_| container::background(get_color(counts.le)))
+                    .padding(1),
+                container(text(get_hms(counts.rw)).size(tsize).color(tcolor))
+                    .style(move |_| container::background(get_color(counts.rw)))
+                    .padding(1),
 
-    let name_box = gtk4::Box::builder()
-        .orientation(gtk4::Orientation::Vertical)
-        .build();
+            ]
+        ]
+        .spacing(10)
+    )
+    .style(move |_| container::background(color!(0x2b2d31)))
+    .padding(10);
 
-    let time_box = gtk4::Box::builder()
-        .orientation(gtk4::Orientation::Vertical)
-        .build();
 
-    let wb_name = gtk4::Label::builder()
-        .label("World Boss")
-        .halign(gtk4::Align::Start)
-        .build();
-    wb_name.add_css_class("base");
+    return cont.into();
+}
 
-    let le_name = gtk4::Label::builder()
-        .label("Legion Event")
-        .halign(gtk4::Align::Start)
-        .build();
-    le_name.add_css_class("base");
-
-    let rw_name = gtk4::Label::builder()
-        .label("Realm Walker")
-        .halign(gtk4::Align::Start)
-        .build();
-    rw_name.add_css_class("base");
-
-    let wb = gtk4::Label::builder().label("0").build();
-    let le = gtk4::Label::builder().label("0").build();
-    let rw = gtk4::Label::builder().label("0").build();
-
-    wb.add_css_class("normal");
-    le.add_css_class("normal");
-    rw.add_css_class("normal");
-
-    // Run the update thread
-    glib::spawn_future_local(glib::clone!(
-        #[weak]
-        wb,
-        #[weak]
-        le,
-        #[weak]
-        rw,
-        async move {
-            loop {
-                update_view(&wb, &le, &rw);
-                glib::timeout_future_seconds(1).await;
-            }
-        }
-    ));
-
-    // Build the UI arrangement
-    hzt_box.append(&name_box);
-    hzt_box.append(&time_box);
-    name_box.append(&wb_name);
-    name_box.append(&le_name);
-    name_box.append(&rw_name);
-    time_box.append(&wb);
-    time_box.append(&le);
-    time_box.append(&rw);
-
-    // Create and display the window
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .title("Diablo 4 Events")
-        .child(&hzt_box)
-        .build();
-
-    window.present()
+fn subscription(_: &Counts) -> Subscription<Message> {
+    time::every(std::time::Duration::from_secs(1)).map(|_| Message::Tick)
 }
 
 fn main() {
     let args = get_args();
     setup_logging(&args);
-    let app = Application::builder().application_id(APP_ID).build();
 
-    app.connect_startup(|_| load_css());
-    app.connect_activate(build_ui);
-    app.run();
+    let _ = iced::application(Counts::default, update, view)
+        .window_size(iced::Size::new(367.0, 150.0))
+        .title("Diablo 4 Events")
+        .subscription(subscription)
+        .run();
 }
 
 #[cfg(test)]
