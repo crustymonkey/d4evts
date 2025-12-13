@@ -8,8 +8,6 @@ use iced::widget::{text, column, container, row};
 use iced::{time, Element, Subscription};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const APP_ID: &str = "com.splitstreams.d4evts";
-
 #[derive(Parser, Debug)]
 #[command(
     name=crate_name!(),
@@ -19,6 +17,9 @@ const APP_ID: &str = "com.splitstreams.d4evts";
     long_about=None)
 ]
 struct Args {
+    /// Turn on Realm Walker timing
+    #[arg(short, long, default_value_t=false)]
+    realm_walker: bool,
     /// Turn on debug output
     #[arg(short = 'D', long)]
     debug: bool,
@@ -53,6 +54,18 @@ struct Counts {
     wb: u64,
     le: u64,
     rw: u64,
+    realm_walker: bool,
+}
+
+impl Counts {
+    fn new(realm_walker: bool) -> Self {
+        Counts {
+            wb: 0,
+            le: 0,
+            rw: 0,
+            realm_walker,
+        }
+    }
 }
 
 struct GlobalLogger;
@@ -169,30 +182,38 @@ fn view(counts: &Counts) -> Element<'_, Message> {
     let tsize = 30;
     let label_col = color!(0xffffff);
     let tcolor = color!(0x000000);
-    let cont = container(
-        row![
-            column![
-                container(text("World Boss").size(tsize).color(label_col))
-                    .padding(1),
-                container(text("Legion Event").size(tsize).color(label_col))
-                    .padding(1),
-                container(text("Realm Walker").size(tsize).color(label_col))
-                    .padding(1),
-            ],
-            column![
-                container(text(get_hms(counts.wb)).size(tsize).color(tcolor))
-                    .style(move |_| container::background(get_color(counts.wb)))
-                    .padding(1),
-                container(text(get_hms(counts.le)).size(tsize).color(tcolor))
-                    .style(move |_| container::background(get_color(counts.le)))
-                    .padding(1),
-                container(text(get_hms(counts.rw)).size(tsize).color(tcolor))
-                    .style(move |_| container::background(get_color(counts.rw)))
-                    .padding(1),
 
-            ]
-        ]
-        .spacing(10)
+    let mut label_column = column![
+        container(text("World Boss").size(tsize).color(label_col))
+            .padding(1),
+        container(text("Legion Event").size(tsize).color(label_col))
+            .padding(1),
+    ];
+
+    let mut val_column = column![
+        container(text(get_hms(counts.wb)).size(tsize).color(tcolor))
+            .style(move |_| container::background(get_color(counts.wb)))
+            .padding(1),
+        container(text(get_hms(counts.le)).size(tsize).color(tcolor))
+            .style(move |_| container::background(get_color(counts.le)))
+            .padding(1),
+    ];
+
+    if counts.realm_walker {
+        // Add Realm Walker to the columns if its enabled
+        label_column = label_column.push(
+            container(text("Realm Walker").size(tsize).color(label_col))
+            .padding(1)
+        );
+        val_column = val_column.push(
+            container(text(get_hms(counts.rw)).size(tsize).color(tcolor))
+            .style(move |_| container::background(get_color(counts.rw)))
+            .padding(1)
+        );
+    }
+
+    let cont = container(
+        row![label_column, val_column].spacing(10)
     )
     .style(move |_| container::background(color!(0x2b2d31)))
     .padding(10);
@@ -209,8 +230,13 @@ fn main() {
     let args = get_args();
     setup_logging(&args);
 
-    let _ = iced::application(Counts::default, update, view)
-        .window_size(iced::Size::new(367.0, 150.0))
+    let mut wsize = iced::Size::new(367.0, 110.0);
+    if args.realm_walker {
+        wsize.height = 150.0;
+    }
+
+    let _ = iced::application(move || Counts::new(args.realm_walker), update, view)
+        .window_size(wsize)
         .title("Diablo 4 Events")
         .subscription(subscription)
         .run();
