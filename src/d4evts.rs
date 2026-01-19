@@ -19,6 +19,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 struct Args {
     /// Turn on Realm Walker timing
     #[arg(short, long, default_value_t=false)]
+    asmodan: bool,
+    /// Turn on Realm Walker timing
+    #[arg(short, long, default_value_t=false)]
     realm_walker: bool,
     /// Turn on debug output
     #[arg(short = 'D', long)]
@@ -36,12 +39,16 @@ const LE_EVERY: u64 = 60 * 25; // Every 25 minutes
 // Realm Walker
 const RW_INIT: u64 = 1728414300;
 const RW_EVERY: u64 = 60 * 15; // Every 15 minutes
+// Assmodan
+const AS_INIT: u64 = 1768855500;
+const AS_EVERY: u64 = 60 * 210; // Every 3.5 hours
 
 /// This is used as an argument to calculate particular deltas
 enum EventType {
     WB,
     LE,
     RW,
+    ASS,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -54,17 +61,22 @@ struct Counts {
     wb: u64,
     le: u64,
     rw: u64,
+    ass: u64,
+    asmodan: bool,
     realm_walker: bool,
+
 }
 
 impl Counts {
-    fn new(realm_walker: bool) -> Self {
-        Counts {
+    fn new(asmodan: bool, realm_walker: bool) -> Self {
+        return Self {
             wb: 0,
             le: 0,
             rw: 0,
+            ass: 0,
+            asmodan: asmodan,
             realm_walker,
-        }
+        };
     }
 }
 
@@ -139,6 +151,10 @@ fn calc_delta(ev: EventType, ts: Option<u64>) -> u64 {
             elapsed = (now - RW_INIT) % RW_EVERY;
             delta = RW_EVERY - elapsed;
         }
+        EventType::ASS => {
+            elapsed = (now - AS_INIT) % AS_EVERY;
+            delta = AS_EVERY - elapsed;
+        }
     };
 
     debug!("Got delta of: {delta}");
@@ -174,6 +190,7 @@ fn update(counts: &mut Counts, _: Message) {
     counts.wb = calc_delta(EventType::WB, None);
     counts.le = calc_delta(EventType::LE, None);
     counts.rw = calc_delta(EventType::RW, None);
+    counts.ass = calc_delta(EventType::ASS, None);
 }
 
 /// This actually builds out the UI and presents it.  It also spawns the
@@ -212,6 +229,19 @@ fn view(counts: &Counts) -> Element<'_, Message> {
         );
     }
 
+    if counts.asmodan {
+        // Add Assmodan to the columns if its enabled
+        label_column = label_column.push(
+            container(text("Assmodan").size(tsize).color(label_col))
+            .padding(1)
+        );
+        val_column = val_column.push(
+            container(text(get_hms(counts.ass)).size(tsize).color(tcolor))
+            .style(move |_| container::background(get_color(counts.ass)))
+            .padding(1)
+        );
+    }
+
     let cont = container(
         row![label_column, val_column].spacing(10)
     )
@@ -231,11 +261,11 @@ fn main() {
     setup_logging(&args);
 
     let mut wsize = iced::Size::new(367.0, 110.0);
-    if args.realm_walker {
+    if args.realm_walker || args.asmodan {
         wsize.height = 150.0;
     }
 
-    let _ = iced::application(move || Counts::new(args.realm_walker), update, view)
+    let _ = iced::application(move || Counts::new(args.asmodan, args.realm_walker), update, view)
         .window_size(wsize)
         .title("Diablo 4 Events")
         .subscription(subscription)
