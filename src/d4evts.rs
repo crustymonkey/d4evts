@@ -261,8 +261,12 @@ fn main() {
     setup_logging(&args);
 
     let mut wsize = iced::Size::new(367.0, 110.0);
-    if args.realm_walker || args.asmodan {
-        wsize.height = 150.0;
+    if args.realm_walker {
+        wsize.height += 40.0;
+    }
+
+    if args.asmodan {
+        wsize.height += 40.0;
     }
 
     let _ = iced::application(move || Counts::new(args.asmodan, args.realm_walker), update, view)
