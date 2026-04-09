@@ -3,6 +3,11 @@ name = "d4evts"
 version = "0.3.3"
 description = "A simple Diablo 4 'clock' to show the next world boss and legion events"
 edition = "2021"
+authors = ["Jay Deiman <admin@splitstreams.com>"]
+repository = "https://github.com/crustymonkey/d4evts"
+homepage = "https://github.com/crustymonkey/d4evts"
+readme = "README.md"
+license = "GPL-2.0-or-later"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
