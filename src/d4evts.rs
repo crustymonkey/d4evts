@@ -5,7 +5,7 @@
 use chrono;
 use clap::Parser;
 use iced::widget::{text, column, container, row};
-use iced::{time, Element, Subscription};
+use iced::{Element, Subscription, time};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Parser, Debug)]
@@ -17,7 +17,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
     long_about=None)
 ]
 struct Args {
-    /// Turn on Realm Walker timing
+    /// Turn on Assmodan timing
     #[arg(short, long, default_value_t=false)]
     asmodan: bool,
     /// Turn on Realm Walker timing
@@ -29,7 +29,6 @@ struct Args {
 }
 
 static LOGGER: GlobalLogger = GlobalLogger;
-// Setup the constants used for calculations
 // World Boss
 const WB_INIT: u64 = 1708381800;
 const WB_EVERY: u64 = 60 * 210; // Every 3.5 hours
@@ -42,8 +41,9 @@ const RW_EVERY: u64 = 60 * 15; // Every 15 minutes
 // Assmodan
 const AS_INIT: u64 = 1768855500;
 const AS_EVERY: u64 = 60 * 210; // Every 3.5 hours
+// Helltide: starts at top of every hour, lasts 55 minutes
+const HT_DURATION: u64 = 60 * 55;
 
-/// This is used as an argument to calculate particular deltas
 enum EventType {
     WB,
     LE,
@@ -62,9 +62,10 @@ struct Counts {
     le: u64,
     rw: u64,
     ass: u64,
+    ht_active: bool,
+    ht_secs: u64,
     asmodan: bool,
     realm_walker: bool,
-
 }
 
 impl Counts {
@@ -74,7 +75,9 @@ impl Counts {
             le: 0,
             rw: 0,
             ass: 0,
-            asmodan: asmodan,
+            ht_active: false,
+            ht_secs: 0,
+            asmodan,
             realm_walker,
         };
     }
@@ -82,7 +85,6 @@ impl Counts {
 
 struct GlobalLogger;
 
-/// This implements the logging to stderr from the `log` crate
 impl log::Log for GlobalLogger {
     fn enabled(&self, meta: &log::Metadata) -> bool {
         return meta.level() <= log::max_level();
@@ -106,12 +108,10 @@ impl log::Log for GlobalLogger {
     fn flush(&self) {}
 }
 
-/// Create a set of CLI args via the `clap` crate and return the matches
 fn get_args() -> Args {
     return Args::parse();
 }
 
-/// Set the global logger from the `log` crate
 fn setup_logging(args: &Args) {
     let l = if args.debug {
         log::LevelFilter::Debug
@@ -123,11 +123,8 @@ fn setup_logging(args: &Args) {
     log::set_max_level(l);
 }
 
-/// This calculates the time to the next event for the given EventType.
-/// By default, it uses the current time for this calculation.  This returns
-/// the time in seconds until the next World Boss or Legion Event
+/// Returns seconds until the next occurrence of the given periodic event.
 fn calc_delta(ev: EventType, ts: Option<u64>) -> u64 {
-    // The ts argument here is for testing purposes
     let now = match ts {
         Some(t) => t,
         None => SystemTime::now()
@@ -135,34 +132,40 @@ fn calc_delta(ev: EventType, ts: Option<u64>) -> u64 {
             .unwrap()
             .as_secs(),
     };
-    let elapsed;
-    let delta;
 
-    match ev {
-        EventType::WB => {
-            elapsed = (now - WB_INIT) % WB_EVERY;
-            delta = WB_EVERY - elapsed;
-        }
-        EventType::LE => {
-            elapsed = (now - LE_INIT) % LE_EVERY;
-            delta = LE_EVERY - elapsed;
-        }
-        EventType::RW => {
-            elapsed = (now - RW_INIT) % RW_EVERY;
-            delta = RW_EVERY - elapsed;
-        }
-        EventType::ASS => {
-            elapsed = (now - AS_INIT) % AS_EVERY;
-            delta = AS_EVERY - elapsed;
-        }
+    let (elapsed, every) = match ev {
+        EventType::WB  => ((now - WB_INIT) % WB_EVERY,  WB_EVERY),
+        EventType::LE  => ((now - LE_INIT) % LE_EVERY,  LE_EVERY),
+        EventType::RW  => ((now - RW_INIT) % RW_EVERY,  RW_EVERY),
+        EventType::ASS => ((now - AS_INIT) % AS_EVERY,  AS_EVERY),
     };
 
+    let delta = every - elapsed;
     debug!("Got delta of: {delta}");
     return delta;
 }
 
-/// This converts a delta (time remaining until event) in the form of seconds
-/// into an H:MM:SS string
+/// Returns (active, secs) for the current helltide state.
+/// When active, secs is the time remaining in the helltide.
+/// When inactive, secs is the time until the next helltide starts.
+fn calc_helltide(ts: Option<u64>) -> (bool, u64) {
+    let now = match ts {
+        Some(t) => t,
+        None => SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+    };
+    let secs_in_hour = now % 3600;
+
+    if secs_in_hour < HT_DURATION {
+        (true, HT_DURATION - secs_in_hour)
+    } else {
+        (false, 3600 - secs_in_hour)
+    }
+}
+
+/// Formats H:MM:SS for events that may span multiple hours.
 fn get_hms(delta: u64) -> String {
     let mut hours: u64 = 0;
     let seconds = delta % 60;
@@ -176,6 +179,19 @@ fn get_hms(delta: u64) -> String {
     return format!("  {hours}:{mins:02}:{seconds:02}  ");
 }
 
+/// Formats MM:SS for helltide display.
+/// During an active helltide the value is prefixed with '-'.
+/// During the gap it is shown as a plain positive countdown.
+fn get_helltide_str(active: bool, secs: u64) -> String {
+    let mins = secs / 60;
+    let s = secs % 60;
+    if active {
+        format!("    -{mins:02}:{s:02}  ")
+    } else {
+        format!("  0:{mins:02}:{s:02}  ")
+    }
+}
+
 fn get_color(delta: u64) -> iced::Color {
     if delta <= 300 {
         return color!(0xff8080); // Red
@@ -186,25 +202,36 @@ fn get_color(delta: u64) -> iced::Color {
     }
 }
 
+fn get_helltide_color(active: bool, secs: u64) -> iced::Color {
+    debug!("Helltide active: {active}, secs: {secs}");
+    if active && secs > 600 {
+        color!(0xff6600) // Orange — helltide is live
+    } else if active && secs <= 300 {
+        color!(0xff8080) // Red
+    } else if active && secs <= 600 {
+        color!(0xffff00) // Yellow
+    } else {
+        color!(0x808080) // Gray
+    }
+}
+
 fn update(counts: &mut Counts, _: Message) {
     counts.wb = calc_delta(EventType::WB, None);
     counts.le = calc_delta(EventType::LE, None);
     counts.rw = calc_delta(EventType::RW, None);
     counts.ass = calc_delta(EventType::ASS, None);
+    (counts.ht_active, counts.ht_secs) = calc_helltide(None);
 }
 
-/// This actually builds out the UI and presents it.  It also spawns the
-/// future loop
 fn view(counts: &Counts) -> Element<'_, Message> {
     let tsize = 30;
     let label_col = color!(0xffffff);
     let tcolor = color!(0x000000);
 
     let mut label_column = column![
-        container(text("World Boss").size(tsize).color(label_col))
-            .padding(1),
-        container(text("Legion Event").size(tsize).color(label_col))
-            .padding(1),
+        container(text("World Boss").size(tsize).color(label_col)).padding(1),
+        container(text("Legion Event").size(tsize).color(label_col)).padding(1),
+        container(text("Helltide").size(tsize).color(label_col)).padding(1),
     ];
 
     let mut val_column = column![
@@ -214,31 +241,30 @@ fn view(counts: &Counts) -> Element<'_, Message> {
         container(text(get_hms(counts.le)).size(tsize).color(tcolor))
             .style(move |_| container::background(get_color(counts.le)))
             .padding(1),
+        container(text(get_helltide_str(counts.ht_active, counts.ht_secs)).size(tsize).color(tcolor))
+            .style(move |_| container::background(get_helltide_color(counts.ht_active, counts.ht_secs)))
+            .padding(1),
     ];
 
     if counts.realm_walker {
-        // Add Realm Walker to the columns if its enabled
         label_column = label_column.push(
-            container(text("Realm Walker").size(tsize).color(label_col))
-            .padding(1)
+            container(text("Realm Walker").size(tsize).color(label_col)).padding(1)
         );
         val_column = val_column.push(
             container(text(get_hms(counts.rw)).size(tsize).color(tcolor))
-            .style(move |_| container::background(get_color(counts.rw)))
-            .padding(1)
+                .style(move |_| container::background(get_color(counts.rw)))
+                .padding(1)
         );
     }
 
     if counts.asmodan {
-        // Add Assmodan to the columns if its enabled
         label_column = label_column.push(
-            container(text("Assmodan").size(tsize).color(label_col))
-            .padding(1)
+            container(text("Assmodan").size(tsize).color(label_col)).padding(1)
         );
         val_column = val_column.push(
             container(text(get_hms(counts.ass)).size(tsize).color(tcolor))
-            .style(move |_| container::background(get_color(counts.ass)))
-            .padding(1)
+                .style(move |_| container::background(get_color(counts.ass)))
+                .padding(1)
         );
     }
 
@@ -247,7 +273,6 @@ fn view(counts: &Counts) -> Element<'_, Message> {
     )
     .style(move |_| container::background(color!(0x2b2d31)))
     .padding(10);
-
 
     return cont.into();
 }
@@ -260,11 +285,11 @@ fn main() {
     let args = get_args();
     setup_logging(&args);
 
-    let mut wsize = iced::Size::new(367.0, 110.0);
+    // Base size: helltide + world boss + legion event (3 rows)
+    let mut wsize = iced::Size::new(367.0, 150.0);
     if args.realm_walker {
         wsize.height += 40.0;
     }
-
     if args.asmodan {
         wsize.height += 40.0;
     }
@@ -299,20 +324,58 @@ mod tests {
         assert_eq!(
             WB_EVERY - (3600 + 600 + 8),
             calc_delta(EventType::WB, Some(wb_ts))
-        ); // 1:10:08
+        );
 
         // init + 1:10:08
         let le_ts = LE_INIT + 3600 + 600 + 8;
         assert_eq!(
             LE_EVERY - (20 * 60 + 8),
             calc_delta(EventType::LE, Some(le_ts))
-        ); // 0:20:08
+        );
 
         // init + 1:10:08
         let rw_ts = RW_INIT + 3600 + 600 + 8;
         assert_eq!(
             RW_EVERY - (10 * 60 + 8),
             calc_delta(EventType::RW, Some(rw_ts))
-        ); // 0:20:08
+        );
+    }
+
+    #[test]
+    fn test_calc_helltide() {
+        // Top of hour — helltide just started, 55:00 remaining
+        let ts = 3600u64 * 100; // any exact hour boundary
+        let (active, secs) = calc_helltide(Some(ts));
+        assert!(active);
+        assert_eq!(secs, HT_DURATION);
+
+        // 1 second in — 54:59 remaining
+        let (active, secs) = calc_helltide(Some(ts + 1));
+        assert!(active);
+        assert_eq!(secs, HT_DURATION - 1);
+
+        // Last second of helltide (secs_in_hour = HT_DURATION - 1)
+        let (active, secs) = calc_helltide(Some(ts + HT_DURATION - 1));
+        assert!(active);
+        assert_eq!(secs, 1);
+
+        // Helltide just ended — 5:00 gap
+        let (active, secs) = calc_helltide(Some(ts + HT_DURATION));
+        assert!(!active);
+        assert_eq!(secs, 3600 - HT_DURATION);
+
+        // Last second before next helltide
+        let (active, secs) = calc_helltide(Some(ts + 3599));
+        assert!(!active);
+        assert_eq!(secs, 1);
+    }
+
+    #[test]
+    fn test_get_helltide_str() {
+        assert_eq!("  -55:00  ", get_helltide_str(true, 3300));
+        assert_eq!("  -00:01  ", get_helltide_str(true, 1));
+        assert_eq!("  -00:00  ", get_helltide_str(true, 0));
+        assert_eq!("  05:00  ", get_helltide_str(false, 300));
+        assert_eq!("  00:01  ", get_helltide_str(false, 1));
     }
 }

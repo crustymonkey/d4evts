@@ -1,6 +1,6 @@
 [package]
 name = "d4evts"
-version = "0.3.3"
+version = "0.4.0"
 description = "A simple Diablo 4 'clock' to show the next world boss and legion events"
 edition = "2021"
 authors = ["Jay Deiman <admin@splitstreams.com>"]
