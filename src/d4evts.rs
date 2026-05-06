@@ -385,10 +385,10 @@ mod tests {
 
     #[test]
     fn test_get_helltide_str() {
-        assert_eq!("  -55:00  ", get_helltide_str(true, 3300));
-        assert_eq!("  -00:01  ", get_helltide_str(true, 1));
-        assert_eq!("  -00:00  ", get_helltide_str(true, 0));
-        assert_eq!("  05:00  ", get_helltide_str(false, 300));
-        assert_eq!("  00:01  ", get_helltide_str(false, 1));
+        assert_eq!("    -55:00  ", get_helltide_str(true, 3300));
+        assert_eq!("    -00:01  ", get_helltide_str(true, 1));
+        assert_eq!("    -00:00  ", get_helltide_str(true, 0));
+        assert_eq!("  0:05:00  ", get_helltide_str(false, 300));
+        assert_eq!("  0:00:01  ", get_helltide_str(false, 1));
     }
 }
