@@ -1,11 +1,14 @@
-#[macro_use] extern crate log;
-#[macro_use] extern crate clap;
-#[macro_use] extern crate iced;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate clap;
+#[macro_use]
+extern crate iced;
 
 use chrono;
 use clap::Parser;
-use iced::widget::{text, column, container, row};
-use iced::{Element, Subscription, time};
+use iced::widget::{column, container, row, text};
+use iced::{time, Element, Subscription};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Parser, Debug)]
@@ -18,10 +21,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 ]
 struct Args {
     /// Turn on Assmodan timing
-    #[arg(short, long, default_value_t=false)]
+    #[arg(short, long, default_value_t = false)]
     asmodan: bool,
     /// Turn on Realm Walker timing
-    #[arg(short, long, default_value_t=false)]
+    #[arg(short, long, default_value_t = false)]
     realm_walker: bool,
     /// Turn on debug output
     #[arg(short = 'D', long)]
@@ -32,16 +35,16 @@ static LOGGER: GlobalLogger = GlobalLogger;
 // World Boss
 const WB_INIT: u64 = 1708381800;
 const WB_EVERY: u64 = 60 * 210; // Every 3.5 hours
-// Legion Event
+                                // Legion Event
 const LE_INIT: u64 = 1708381200;
 const LE_EVERY: u64 = 60 * 25; // Every 25 minutes
-// Realm Walker
+                               // Realm Walker
 const RW_INIT: u64 = 1728414300;
 const RW_EVERY: u64 = 60 * 15; // Every 15 minutes
-// Assmodan
+                               // Assmodan
 const AS_INIT: u64 = 1768855500;
 const AS_EVERY: u64 = 60 * 210; // Every 3.5 hours
-// Helltide: starts at top of every hour, lasts 55 minutes
+                                // Helltide: starts at top of every hour, lasts 55 minutes
 const HT_DURATION: u64 = 60 * 55;
 
 enum EventType {
@@ -134,10 +137,10 @@ fn calc_delta(ev: EventType, ts: Option<u64>) -> u64 {
     };
 
     let (elapsed, every) = match ev {
-        EventType::WB  => ((now - WB_INIT) % WB_EVERY,  WB_EVERY),
-        EventType::LE  => ((now - LE_INIT) % LE_EVERY,  LE_EVERY),
-        EventType::RW  => ((now - RW_INIT) % RW_EVERY,  RW_EVERY),
-        EventType::ASS => ((now - AS_INIT) % AS_EVERY,  AS_EVERY),
+        EventType::WB => ((now - WB_INIT) % WB_EVERY, WB_EVERY),
+        EventType::LE => ((now - LE_INIT) % LE_EVERY, LE_EVERY),
+        EventType::RW => ((now - RW_INIT) % RW_EVERY, RW_EVERY),
+        EventType::ASS => ((now - AS_INIT) % AS_EVERY, AS_EVERY),
     };
 
     let delta = every - elapsed;
@@ -241,38 +244,44 @@ fn view(counts: &Counts) -> Element<'_, Message> {
         container(text(get_hms(counts.le)).size(tsize).color(tcolor))
             .style(move |_| container::background(get_color(counts.le)))
             .padding(1),
-        container(text(get_helltide_str(counts.ht_active, counts.ht_secs)).size(tsize).color(tcolor))
-            .style(move |_| container::background(get_helltide_color(counts.ht_active, counts.ht_secs)))
-            .padding(1),
+        container(
+            text(get_helltide_str(counts.ht_active, counts.ht_secs))
+                .size(tsize)
+                .color(tcolor)
+        )
+        .style(move |_| container::background(get_helltide_color(
+            counts.ht_active,
+            counts.ht_secs
+        )))
+        .padding(1),
     ];
 
     if counts.realm_walker {
         label_column = label_column.push(
-            container(text("Realm Walker").size(tsize).color(label_col)).padding(1)
+            container(text("Realm Walker").size(tsize).color(label_col))
+                .padding(1),
         );
         val_column = val_column.push(
             container(text(get_hms(counts.rw)).size(tsize).color(tcolor))
                 .style(move |_| container::background(get_color(counts.rw)))
-                .padding(1)
+                .padding(1),
         );
     }
 
     if counts.asmodan {
         label_column = label_column.push(
-            container(text("Assmodan").size(tsize).color(label_col)).padding(1)
+            container(text("Assmodan").size(tsize).color(label_col)).padding(1),
         );
         val_column = val_column.push(
             container(text(get_hms(counts.ass)).size(tsize).color(tcolor))
                 .style(move |_| container::background(get_color(counts.ass)))
-                .padding(1)
+                .padding(1),
         );
     }
 
-    let cont = container(
-        row![label_column, val_column].spacing(10)
-    )
-    .style(move |_| container::background(color!(0x2b2d31)))
-    .padding(10);
+    let cont = container(row![label_column, val_column].spacing(10))
+        .style(move |_| container::background(color!(0x2b2d31)))
+        .padding(10);
 
     return cont.into();
 }
@@ -294,11 +303,15 @@ fn main() {
         wsize.height += 40.0;
     }
 
-    let _ = iced::application(move || Counts::new(args.asmodan, args.realm_walker), update, view)
-        .window_size(wsize)
-        .title("Diablo 4 Events")
-        .subscription(subscription)
-        .run();
+    let _ = iced::application(
+        move || Counts::new(args.asmodan, args.realm_walker),
+        update,
+        view,
+    )
+    .window_size(wsize)
+    .title("Diablo 4 Events")
+    .subscription(subscription)
+    .run();
 }
 
 #[cfg(test)]
